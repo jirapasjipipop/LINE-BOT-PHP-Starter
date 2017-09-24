@@ -1,5 +1,5 @@
 <?php
-$access_token = 'XXXXXXXXXXXXXXXXXXXXXXX';
+$access_token = 'BVfLp1yOUeUZpcqoRbdApEW6hqHvCCNLSAWPdRkYW1otsToobQ2qTvcyte5t0G8wXTtUJuZF71f0orZZuZe+halI1AXHiwZaxZbTCDR5xSCMPVvlRwSIOsuesPAwEjWAlREQ7aR9XPEiFV1/tNgdBAdB04t89/1O/w1cDnyilFU=';
 
 // Get POST body content
 $content = file_get_contents('php://input');
