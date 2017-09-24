@@ -19,22 +19,10 @@
 namespace LINE\LINEBot\KitchenSink\EventHandler\MessageHandler;
 
 use LINE\LINEBot;
-use LINE\LINEBot\ImagemapActionBuilder\AreaBuilder;
-use LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder;
-use LINE\LINEBot\ImagemapActionBuilder\ImagemapUriActionBuilder;
-use LINE\LINEBot\TemplateActionBuilder\MessageTemplateActionBuilder;
-use LINE\LINEBot\TemplateActionBuilder\PostbackTemplateActionBuilder;
-use LINE\LINEBot\TemplateActionBuilder\UriTemplateActionBuilder;
 use LINE\LINEBot\Event\MessageEvent\TextMessage;
 use LINE\LINEBot\KitchenSink\EventHandler;
-use LINE\LINEBot\KitchenSink\EventHandler\MessageHandler\Util\UrlBuilder;
-use LINE\LINEBot\MessageBuilder\Imagemap\BaseSizeBuilder;
-use LINE\LINEBot\MessageBuilder\ImagemapMessageBuilder;
-use LINE\LINEBot\MessageBuilder\TemplateMessageBuilder;
-use LINE\LINEBot\MessageBuilder\TemplateBuilder\ButtonTemplateBuilder;
-use LINE\LINEBot\MessageBuilder\TemplateBuilder\CarouselColumnTemplateBuilder;
-use LINE\LINEBot\MessageBuilder\TemplateBuilder\CarouselTemplateBuilder;
-use LINE\LINEBot\MessageBuilder\TemplateBuilder\ConfirmTemplateBuilder;
+
+use Predis\Client;
 
 class TextMessageHandler implements EventHandler
 {
@@ -46,6 +34,8 @@ class TextMessageHandler implements EventHandler
     private $req;
     /** @var TextMessage $textMessage */
     private $textMessage;
+
+    private $redis;
 
     /**
      * TextMessageHandler constructor.
@@ -60,136 +50,52 @@ class TextMessageHandler implements EventHandler
         $this->logger = $logger;
         $this->req = $req;
         $this->textMessage = $textMessage;
+        $this->redis = new Client(getenv('REDIS_URL'));
     }
 
     public function handle()
     {
+        $TEACH_SIGN = '==';
         $text = $this->textMessage->getText();
+        $text = trim($text);
+        # Remove ZWSP
+        $text = str_replace("\xE2\x80\x8B", "", $text);
         $replyToken = $this->textMessage->getReplyToken();
-        $this->logger->info("Got text message from $replyToken: $text");
 
-        switch ($text) {
-            case 'profile':
-                $userId = $this->textMessage->getUserId();
-                $this->sendProfile($replyToken, $userId);
-                break;
-            case 'bye':
-                if ($this->textMessage->isRoomEvent()) {
-                    $this->bot->replyText($replyToken, 'Leaving room');
-                    $this->bot->leaveRoom($this->textMessage->getRoomId());
-                    break;
-                }
-                if ($this->textMessage->isGroupEvent()) {
-                    $this->bot->replyText($replyToken, 'Leaving group');
-                    $this->bot->leaveGroup($this->textMessage->getGroupId());
-                    break;
-                }
-                $this->bot->replyText($replyToken, 'Bot cannot leave from 1:1 chat');
-                break;
-            case 'confirm':
-                $this->bot->replyMessage(
-                    $replyToken,
-                    new TemplateMessageBuilder(
-                        'Confirm alt text',
-                        new ConfirmTemplateBuilder('Do it?', [
-                            new MessageTemplateActionBuilder('Yes', 'Yes!'),
-                            new MessageTemplateActionBuilder('No', 'No!'),
-                        ])
-                    )
-                );
-                break;
-            case 'buttons':
-                $imageUrl = UrlBuilder::buildUrl($this->req, ['static', 'buttons', '1040.jpg']);
-                $buttonTemplateBuilder = new ButtonTemplateBuilder(
-                    'My button sample',
-                    'Hello my button',
-                    $imageUrl,
-                    [
-                        new UriTemplateActionBuilder('Go to line.me', 'https://line.me'),
-                        new PostbackTemplateActionBuilder('Buy', 'action=buy&itemid=123'),
-                        new PostbackTemplateActionBuilder('Add to cart', 'action=add&itemid=123'),
-                        new MessageTemplateActionBuilder('Say message', 'hello hello'),
-                    ]
-                );
-                $templateMessage = new TemplateMessageBuilder('Button alt text', $buttonTemplateBuilder);
-                $this->bot->replyMessage($replyToken, $templateMessage);
-                break;
-            case 'carousel':
-                $imageUrl = UrlBuilder::buildUrl($this->req, ['static', 'buttons', '1040.jpg']);
-                $carouselTemplateBuilder = new CarouselTemplateBuilder([
-                    new CarouselColumnTemplateBuilder('foo', 'bar', $imageUrl, [
-                        new UriTemplateActionBuilder('Go to line.me', 'https://line.me'),
-                        new PostbackTemplateActionBuilder('Buy', 'action=buy&itemid=123'),
-                    ]),
-                    new CarouselColumnTemplateBuilder('buz', 'qux', $imageUrl, [
-                        new PostbackTemplateActionBuilder('Add to cart', 'action=add&itemid=123'),
-                        new MessageTemplateActionBuilder('Say message', 'hello hello'),
-                    ]),
-                ]);
-                $templateMessage = new TemplateMessageBuilder('Button alt text', $carouselTemplateBuilder);
-                $this->bot->replyMessage($replyToken, $templateMessage);
-                break;
-            case 'imagemap':
-                $richMessageUrl = UrlBuilder::buildUrl($this->req, ['static', 'rich']);
-                $imagemapMessageBuilder = new ImagemapMessageBuilder(
-                    $richMessageUrl,
-                    'This is alt text',
-                    new BaseSizeBuilder(1040, 1040),
-                    [
-                        new ImagemapUriActionBuilder(
-                            'https://store.line.me/family/manga/en',
-                            new AreaBuilder(0, 0, 520, 520)
-                        ),
-                        new ImagemapUriActionBuilder(
-                            'https://store.line.me/family/music/en',
-                            new AreaBuilder(520, 0, 520, 520)
-                        ),
-                        new ImagemapUriActionBuilder(
-                            'https://store.line.me/family/play/en',
-                            new AreaBuilder(0, 520, 520, 520)
-                        ),
-                        new ImagemapMessageActionBuilder(
-                            'URANAI!',
-                            new AreaBuilder(520, 520, 520, 520)
-                        )
-                    ]
-                );
-                $this->bot->replyMessage($replyToken, $imagemapMessageBuilder);
-                break;
-            default:
-                $this->echoBack($replyToken, $text);
-                break;
+        if ($text == 'บอท') {
+            $this->bot->replyText($replyToken, $out =
+                "คุณสามารถสอนเราให้เข้าใจภาษามนุษย์ได้");
+            return true;
         }
+
+        $sep_pos = strpos($text, $TEACH_SIGN);
+        if ($sep_pos > 0) {
+            $text_arr = explode($TEACH_SIGN, $text, 2);
+            if (count($text_arr) == 2) {
+                $this->saveResponse($text_arr[0], $text_arr[1]);
+            }
+            return true;
+        }
+
+        $re = $this->getResponse($text);
+        $re_count = count($re);
+        if ($re_count > 0) {
+            // Random response.
+            $randNum = rand(0, $re_count - 1);
+            $response = $re[$randNum];
+            $this->bot->replyText($replyToken, $response);
+            return true;
+        }
+        return false;
     }
 
-    /**
-     * @param string $replyToken
-     * @param string $text
-     */
-    private function echoBack($replyToken, $text)
+    private function saveResponse($keyword, $response)
     {
-        $this->logger->info("Returns echo message $replyToken: $text");
-        $this->bot->replyText($replyToken, $text);
+        $this->redis->lpush("response:$keyword", $response);
     }
 
-    private function sendProfile($replyToken, $userId)
+    private function getResponse($keyword)
     {
-        if (!isset($userId)) {
-            $this->bot->replyText($replyToken, "Bot can't use profile API without user ID");
-            return;
-        }
-
-        $response = $this->bot->getProfile($userId);
-        if (!$response->isSucceeded()) {
-            $this->bot->replyText($replyToken, $response->getRawBody());
-            return;
-        }
-
-        $profile = $response->getJSONDecodedBody();
-        $this->bot->replyText(
-            $replyToken,
-            'Display name: ' . $profile['displayName'],
-            'Status message: ' . $profile['statusMessage']
-        );
+        return $this->redis->lrange("response:$keyword", 0, -1);
     }
 }
